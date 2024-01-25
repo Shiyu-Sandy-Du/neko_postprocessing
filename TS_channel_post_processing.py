@@ -28,13 +28,8 @@ start = int(rank*nelemy/size)
 stop = int((rank+1)*nelemy/size)
 step = int(nelemy/size)
 
-### read the first time step
-filename = datapath + fieldname + '.f00000'
-dsi = readnek(filename)
-element = dsi.elem
-
 # establish a mapping from 1D field into 3D field
-field1d_map = np.array(range(len(element)))
+field1d_map = np.array(range(nelemx*nelemy*nelemz))
 field3d_map = np.reshape(field1d_map,[nelemz,nelemy,nelemx])
 
 if rank == 0:
@@ -47,20 +42,10 @@ if rank == 0:
 
 for ipl in range(npl):
     if rank == 0:
-        print("perform fft on time step:",ipl+1,"/",npl)
-    if ipl != 0:
-        if ipl < 10:
-            filename = datapath+fieldname+'.f0000'+str(ipl)
-        elif ipl < 100:
-            filename = datapath+fieldname+'.f000'+str(ipl)
-        elif ipl < 1000:
-            filename = datapath+fieldname+'.f00'+str(ipl)
-        elif ipl < 10000:
-            filename = datapath+fieldname+'.f0'+str(ipl)
-        else:
-            filename = datapath+fieldname+'.f'+str(ipl)
-        dsi = readnek(filename)
-        element = dsi.elem
+        print("perform fft on time step:",ipl+1,"/",npl)   
+    filename = datapath+fieldname+'.f'+str(ipl).zfill(5)
+    dsi = readnek(filename)
+    element = dsi.elem
     cand_proc_curr = np.zeros(nkx)
     for iy_elem in range(start,stop):
         for iy in range(GLL_order):
@@ -104,4 +89,5 @@ if rank == 0:
     print('total time:', te-ts)
     # dimension np.shape(growth)[0] gives the time step
     # dimension np.shape(growth)[1] gives the kx
+    print(growth[0,:5])
     np.save('test_output.npy', growth)
