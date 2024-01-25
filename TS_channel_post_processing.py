@@ -10,14 +10,14 @@ rank = comm.Get_rank()
 ### case parameters setting
 datapath = ''
 fieldname = 'fieldxz0'
-npl = 2
-nelemy = 18
-kz = 0
-nelemz = nelemy
-nelemx = nelemy
+npl = 2 # number of time steps
+nelemy = 18 # number of elements in y direction
+kz = 0 # intended kz to look at
+nelemz = nelemy # number of elements in z direction
+nelemx = nelemy # number of elements in x direction
 
 ### solver parameters setting
-GLL_order = 8
+GLL_order = 8 # GLL points inside an element
 Leg_order = GLL_order-1
 nkx = nelemx*GLL_order-(nelemx-1)-1
 index_overlapx_Fou = [GLL_order*i for i in range(1,nelemx)]
@@ -104,5 +104,4 @@ if rank == 0:
     print('total time:', te-ts)
     # dimension np.shape(growth)[0] gives the time step
     # dimension np.shape(growth)[1] gives the kx
-    print(growth[0,:5])
     np.save('test_output.npy', growth)
