@@ -1,0 +1,2 @@
+# turb_channel for LES
+This folder is for the postprocessing code for a turb_channel with Re_tau=590 for implicit LES simulation and comparing with explicit LES model under the same Reynolds number (Note! not Re_tau). LES model contains: 1. Dynamic Smagorinsky, 2. Sigma, 3. Smagorinsky, 4. Vreman
