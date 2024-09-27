@@ -19,7 +19,7 @@ if rank == 0:
     ts = time.time()
 
 ### case parameters setting
-# datapath = '/scratch/project_465000921/shiyud/chan_590_large_domain/spectra/'
+# datapath = '/scratch/project_465000921/shiyud/chan_550_min_domain/data/'
 datapath = '/scratch/shiyud/nekoexamples/turb_channel/DNS_590/'
 fieldname = 'field0'
 npl = 1 # number of time steps
@@ -90,11 +90,9 @@ eq_fld = FieldRegistry(comm)
 for ipl in range(npl):
     if rank == 0:
         tstart = time.time()
-    ux_fine_piece = np.empty((step*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=np.float32)
-    # uy_fine = np.zeros((nelemz*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=np.float32)
-    # uz_fine = np.zeros((nelemz*n_fine, nelemy*n_fine, nelemx*n_fiux_hat_avg_DNS_largene), dtype=np.float32)
-    if rank == 0:
         print("Read field file:",ipl+1,"/",npl) 
+    ux_fine_piece = np.empty((step*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=np.float32)
+        
     filename = datapath+fieldname+'.f'+str(ipl).zfill(5)
     pynekread(filename, comm, data_dtype=np.float32, msh=msh, fld=fld)
 
@@ -109,8 +107,6 @@ for ipl in range(npl):
     mapped_fields = mapper.interpolate_from_field_list(comm, field_list=[fld.registry['u']])
 
     eq_fld.add_field(comm, field_name='u', field=mapped_fields[0], dtype = np.float32)
-    # eq_fld.add_field(comm, field_name='v', field=mapped_fields[1], dtype = np.float32)
-    # eq_fld.add_field(comm, field_name='w', field=mapped_fields[2], dtype = np.float32)
 
     ###########################################################################################
     ######## SHOULD BE TURN INTO INDEXING WITH FIELD IN pyNekTools
@@ -125,14 +121,6 @@ for ipl in range(npl):
                         iy_elem * n_fine: (iy_elem + 1) * n_fine, \
                         ix_elem * n_fine: (ix_elem + 1) * n_fine] \
                 = eq_fld.registry['u'][local_el_id, :, :, :]
-                # uy_fine[iz_elem * n_fine: (iz_elem + 1) * n_fine, \
-                #         iy_elem * n_fine: (iy_elem + 1) * n_fine, \
-                #         ix_elem * n_fine: (ix_elem + 1) * n_fine] \
-                # = eq_fld.registry['v'][local_el_id, :, :, :]
-                # uz_fine[iz_elem * n_fine: (iz_elem + 1) * n_fine, \
-                #         iy_elem * n_fine: (iy_elem + 1) * n_fine, \
-                #         ix_elem * n_fine: (ix_elem + 1) * n_fine] \
-                # = eq_fld.registry['w'][local_el_id, :, :, :]
 
     # ### All reduce to form a global array
     ## MPI gather: collect chunks splitted along z-axis
