@@ -144,8 +144,6 @@ for ipl in range(npl):
     # Perform FFT on x and z direction
     ux_hat_iy = np.fft.fft(ux_fine_iyel_noovlp[:-1, :, :-1],axis=0)
     ux_hat_iy = np.fft.fft(ux_hat_iy,axis=2)
-    ux_hat_iy /= np.shape(ux_fine_iyel_noovlp)[0]-1
-    ux_hat_iy /= np.shape(ux_fine_iyel_noovlp)[2]-1
 
     # Averaging over snapshots (currently only ensemble avg)
     ux_hat_avg_piece = \
