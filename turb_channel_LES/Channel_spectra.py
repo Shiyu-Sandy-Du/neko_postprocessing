@@ -13,6 +13,7 @@ comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 rt = Router(comm)
+precision = np.float32
 
 ### Timing
 if rank == 0:
@@ -21,6 +22,7 @@ if rank == 0:
 ### case parameters setting
 # datapath = '/scratch/project_465000921/shiyud/chan_550_min_domain/data/'
 datapath = '/scratch/shiyud/nekoexamples/turb_channel/DNS_590/'
+fieldname_mean = 'mean_field_xz0'
 fieldname = 'field0'
 npl = 1 # number of time steps
 nelemy = 32 # number of elements in y direction
@@ -74,7 +76,7 @@ counts_y_fft = chunk_sizes_y * nelemx * (n_fine-1) * nelemz * (n_fine-1)
 ### allocate memory
 
 if rank == 0:
-    ux_fine = np.empty((nelemz*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=np.float32)
+    ux_fine = np.empty((nelemz*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=precision)
 else:
     ux_fine = None
 
@@ -86,15 +88,21 @@ ux_hat_avg_piece = np.zeros((nelemz*(n_fine - 1), \
 count_snapshot = 0
 msh = Mesh(comm, create_connectivity=False)
 fld = FieldRegistry(comm)
+fld_mean = FieldRegistry(comm)
 eq_fld = FieldRegistry(comm)
+## Read the mean flow
+filename_mean = datapath+fieldname_mean+'.f00000'
+pynekread(filename_mean, comm, data_dtype=precision, msh=msh, fld=fld_mean)
 for ipl in range(npl):
     if rank == 0:
         tstart = time.time()
         print("Read field file:",ipl+1,"/",npl) 
-    ux_fine_piece = np.empty((step*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=np.float32)
+    ux_fine_piece = np.empty((step*n_fine, nelemy*n_fine, nelemx*n_fine), dtype=precision)
         
     filename = datapath+fieldname+'.f'+str(ipl).zfill(5)
-    pynekread(filename, comm, data_dtype=np.float32, msh=msh, fld=fld)
+    pynekread(filename, comm, data_dtype=precision, msh=msh, fld=fld)
+    ## Take the fluctuation
+    fld.add_field(comm, field_name='u_fluc', field=fld.registry['u'] - fld_mean.registry['u'], dtype=precision)
 
     if ipl == 0:
         # initialize the mapper into finer mesh according to the first field
@@ -104,9 +112,9 @@ for ipl in range(npl):
     # eq_fld = mapper.create_mapped_field(comm, fld=fld)
 
     ### interpolate fields separately
-    mapped_fields = mapper.interpolate_from_field_list(comm, field_list=[fld.registry['u']])
+    mapped_fields = mapper.interpolate_from_field_list(comm, field_list=[fld.registry['u_fluc']])
 
-    eq_fld.add_field(comm, field_name='u', field=mapped_fields[0], dtype = np.float32)
+    eq_fld.add_field(comm, field_name='u_fluc', field=mapped_fields[0], dtype = precision)
 
     ###########################################################################################
     ######## SHOULD BE TURN INTO INDEXING WITH FIELD IN pyNekTools
@@ -120,7 +128,7 @@ for ipl in range(npl):
                 ux_fine_piece[iz_elem * n_fine: (iz_elem + 1) * n_fine, \
                         iy_elem * n_fine: (iy_elem + 1) * n_fine, \
                         ix_elem * n_fine: (ix_elem + 1) * n_fine] \
-                = eq_fld.registry['u'][local_el_id, :, :, :]
+                = eq_fld.registry['u_fluc'][local_el_id, :, :, :]
 
     # ### All reduce to form a global array
     ## MPI gather: collect chunks splitted along z-axis
@@ -131,8 +139,8 @@ for ipl in range(npl):
         ux_fine = np.transpose(ux_fine, (1,0,2))
 
     ## MPI scatter: split chunks along y-axis
-    ux_fine_fft_piece = np.empty(chunk_sizes_y[rank]*nelemz*n_fine*nelemx*n_fine, dtype=np.float32)
-    ux_fine_fft_piece = rt.scatter_from_root(data = ux_fine, sendcounts=counts_y, root = 0, dtype = np.float32)
+    ux_fine_fft_piece = np.empty(chunk_sizes_y[rank]*nelemz*n_fine*nelemx*n_fine, dtype=precision)
+    ux_fine_fft_piece = rt.scatter_from_root(data = ux_fine, sendcounts=counts_y, root = 0, dtype = precision)
     ux_fine_fft_piece = np.reshape(ux_fine_fft_piece, (chunk_sizes_y[rank], nelemz*n_fine,  nelemx*n_fine))
 
     ux_fine_fft_piece = np.transpose(ux_fine_fft_piece, (1,0,2))
@@ -162,12 +170,12 @@ for ipl in range(npl):
         print("step time", tend - tstart)
     
 ### All reduce to form a global array for the Fourier modes
-ux_hat_avg_piece_abs = np.abs(ux_hat_avg_piece).astype(np.float32)
+ux_hat_avg_piece_abs = np.abs(ux_hat_avg_piece).astype(precision)
 ux_hat_avg_piece_abs = np.transpose(ux_hat_avg_piece_abs, (1,0,2))
 if rank == 0:
     ux_hat_avg_abs = np.empty((nelemy*n_fine, \
                        nelemz*(n_fine - 1), \
-                       nelemx*(n_fine - 1)), dtype=np.float32)
+                       nelemx*(n_fine - 1)), dtype=precision)
 else:
     ux_hat_avg_abs = None
 
