@@ -21,13 +21,13 @@ if rank == 0:
 
 ### case parameters setting
 # datapath = '/scratch/project_465000921/shiyud/chan_550_min_domain/data/'
-datapath = '/scratch/shiyud/nekoexamples/turb_channel/DNS_590/'
-fieldname_mean = 'mean_field_xz0'
+datapath = '/scratch/shiyud/nekoexamples/turb_channel/DNS_590/tmp/'
+fieldname_mean = 'mean_field200_400_xz0'
 fieldname = 'field0'
 npl = 1 # number of time steps
-nelemy = 32 # number of elements in y direction
-nelemz = 10 # number of elements in z direction
-nelemx = 10 # number of elements in x direction
+nelemy = 36 # number of elements in y direction
+nelemz = 162 # number of elements in z direction
+nelemx = 216 # number of elements in x direction
 nelem = nelemx*nelemy*nelemz
 
 ### solver parameters setting
@@ -80,7 +80,7 @@ if rank == 0:
 else:
     ux_fine = None
 
-ux_hat_avg_piece = np.zeros((nelemz*(n_fine - 1), \
+ux_hat2_avg_piece = np.zeros((nelemz*(n_fine - 1), \
                        chunk_sizes_y[rank], \
                        nelemx*(n_fine - 1)), dtype=np.complex64)
 
@@ -132,7 +132,7 @@ for ipl in range(npl):
 
     # ### All reduce to form a global array
     ## MPI gather: collect chunks splitted along z-axis
-    ux_fine, _ = rt.gather_in_root(data = ux_fine_piece.flatten(), root = 0, dtype = ux_fine_piece.dtype)
+    ux_fine, _ = rt.gather_in_root(data = ux_fine_piece.flatten(), root = 0, gather="gather", dtype = ux_fine_piece.dtype)
 
     if rank == 0:
         ux_fine = np.reshape(ux_fine, (nelemz*n_fine, nelemy*n_fine, nelemx*n_fine))
@@ -152,11 +152,13 @@ for ipl in range(npl):
     # Perform FFT on x and z direction
     ux_hat_iy = np.fft.fft(ux_fine_iyel_noovlp[:-1, :, :-1],axis=0)
     ux_hat_iy = np.fft.fft(ux_hat_iy,axis=2)
+    ux_hat_iy_abs = np.abs(ux_hat_iy).astype(precision)
+    ux_hat2_iy = np.square(ux_hat_iy_abs)
 
     # Averaging over snapshots (currently only ensemble avg)
-    ux_hat_avg_piece = \
-        (ux_hat_avg_piece * count_snapshot \
-        + ux_hat_iy) / (count_snapshot + 1)
+    ux_hat2_avg_piece = \
+        (ux_hat2_avg_piece * count_snapshot \
+        + ux_hat2_iy) / (count_snapshot + 1)
 
     count_snapshot += 1
     
@@ -170,25 +172,24 @@ for ipl in range(npl):
         print("step time", tend - tstart)
     
 ### All reduce to form a global array for the Fourier modes
-ux_hat_avg_piece_abs = np.abs(ux_hat_avg_piece).astype(precision)
-ux_hat_avg_piece_abs = np.transpose(ux_hat_avg_piece_abs, (1,0,2))
+ux_hat2_avg_piece = np.transpose(ux_hat2_avg_piece, (1,0,2))
 if rank == 0:
-    ux_hat_avg_abs = np.empty((nelemy*n_fine, \
+    ux_hat2_avg = np.empty((nelemy*n_fine, \
                        nelemz*(n_fine - 1), \
                        nelemx*(n_fine - 1)), dtype=precision)
 else:
-    ux_hat_avg_abs = None
+    ux_hat2_avg = None
 
-ux_hat_avg_abs, _ = rt.gather_in_root(data = ux_hat_avg_piece_abs.flatten(), root = 0, dtype = ux_hat_avg_piece_abs.dtype)
+ux_hat2_avg, _ = rt.gather_in_root(data = ux_hat2_avg_piece.flatten(), root = 0, gather="gather", dtype = ux_hat2_avg_piece.dtype)
 if rank == 0:
-    ux_hat_avg_abs = np.reshape(ux_hat_avg_abs, (nelemy*n_fine, \
+    ux_hat2_avg = np.reshape(ux_hat2_avg, (nelemy*n_fine, \
                        nelemz*(n_fine - 1), \
                        nelemx*(n_fine - 1)))
-    ux_hat_avg_abs = np.transpose(ux_hat_avg_abs, (1,0,2))
+    ux_hat2_avg = np.transpose(ux_hat2_avg, (1,0,2))
 
 ### Save spectra file
 ### Timing
 if rank == 0:
-    np.save(datapath + 'test1.npy', ux_hat_avg_abs)
+    np.save(datapath + 'test1.npy', ux_hat2_avg)
     te = time.time()
     print("ellapsed time:", te - ts,"s")
